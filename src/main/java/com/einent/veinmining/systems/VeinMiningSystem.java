@@ -86,7 +86,7 @@ public class VeinMiningSystem extends EntityEventSystem<EntityStore, BreakBlockE
 
         if (player.getWorld() != null) {
             event.setCancelled(true);
-            player.getWorld().setBlock(targetPos.x, targetPos.y, targetPos.z, "Empty", PERFORM_BLOCK_UPDATE);
+            MiningManager.setBlock(player.getWorld(), targetPos.x, targetPos.y, targetPos.z, "Empty", PERFORM_BLOCK_UPDATE);
 
             CompletableFuture.runAsync(() -> {
                 if (player.getWorld() == null) return;

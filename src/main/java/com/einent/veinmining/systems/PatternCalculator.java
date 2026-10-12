@@ -12,8 +12,7 @@ import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.BlockChunk;
-import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
+import com.hypixel.hytale.server.core.universe.world.accessor.SectionReader;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.FillerBlockUtil;
@@ -37,10 +36,12 @@ public class PatternCalculator {
         addNeighbors(startPos, queue, visitedPhysical);
 
         int bufferLimit = Math.min(max * 10, 4096);
+        SectionReader reader = new SectionReader(world.getChunkStore());
 
         while (!queue.isEmpty() && visitedPhysical.size() < bufferLimit) {
             Vector3i pos = queue.poll();
-            BlockType type = world.getBlockType(pos.x, pos.y, pos.z);
+            int blockId = reader.getBlock(pos.x, pos.y, pos.z);
+            BlockType type = (blockId == 0) ? BlockType.EMPTY : BlockType.getAssetMap().getAsset(blockId);
 
             if (type != null && type.getId().equals(targetId)) {
                 Vector3i origin = getMultiblockOrigin(world, pos);
@@ -168,6 +169,7 @@ public class PatternCalculator {
         }
 
         if (!pattern.equals("diagonal")) {
+            SectionReader reader = new SectionReader(world.getChunkStore());
             int minW = -(width / 2), maxW = (width / 2);
             int minH, maxH;
             if (height == 1) { minH = 0; maxH = 0; }
@@ -199,7 +201,8 @@ public class PatternCalculator {
                             int h = dot(offset, up);
 
                             if (d >= minD && d <= maxD && w >= minW && w <= maxW && h >= minH && h <= maxH) {
-                                BlockType type = world.getBlockType(neighbor.x, neighbor.y, neighbor.z);
+                                int blockId = reader.getBlock(neighbor.x, neighbor.y, neighbor.z);
+                                BlockType type = (blockId == 0) ? BlockType.EMPTY : BlockType.getAssetMap().getAsset(blockId);
                                 if (type != null && type.getId().equals(targetId)) {
                                     visited.add(neighbor);
                                     queue.add(neighbor);
@@ -246,24 +249,13 @@ public class PatternCalculator {
 
     public Vector3i getMultiblockOrigin(World world, Vector3i pos) {
         try {
-            ChunkStore chunkStore = world.getChunkStore();
-            Store<ChunkStore> store = chunkStore.getStore();
-            long chunkIndex = ChunkUtil.indexChunkFromBlock(pos.x, pos.z);
-            Ref<ChunkStore> chunkRef = chunkStore.getChunkReference(chunkIndex);
-
-            if (chunkRef != null && chunkRef.isValid()) {
-                BlockChunk blockChunk = store.getComponent(chunkRef, BlockChunk.getComponentType());
-                if (blockChunk != null) {
-                    @SuppressWarnings("deprecation")
-                    BlockSection section = blockChunk.getSectionAtBlockY(pos.y);
-                    int filler = section.getFiller(pos.x, pos.y, pos.z);
-                    int fx = FillerBlockUtil.unpackX(filler);
-                    int fy = FillerBlockUtil.unpackY(filler);
-                    int fz = FillerBlockUtil.unpackZ(filler);
-                    if (fx != 0 || fy != 0 || fz != 0) {
-                        return new Vector3i(pos.x - fx, pos.y - fy, pos.z - fz);
-                    }
-                }
+            SectionReader reader = new SectionReader(world.getChunkStore());
+            int filler = reader.getFiller(pos.x, pos.y, pos.z);
+            int fx = FillerBlockUtil.unpackX(filler);
+            int fy = FillerBlockUtil.unpackY(filler);
+            int fz = FillerBlockUtil.unpackZ(filler);
+            if (fx != 0 || fy != 0 || fz != 0) {
+                return new Vector3i(pos.x - fx, pos.y - fy, pos.z - fz);
             }
         } catch (Exception ignored) {}
         return pos;

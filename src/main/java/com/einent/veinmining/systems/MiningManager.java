@@ -32,6 +32,8 @@ import com.hypixel.hytale.server.core.modules.entity.item.ItemComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.accessor.SectionReader;
+import com.hypixel.hytale.server.core.universe.world.chunk.BlockOperations;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.Config;
@@ -66,6 +68,25 @@ public class MiningManager {
     public MiningManager(Config<VeinMiningConfig> config) {
         this.config = config;
         this.patternCalculator = new PatternCalculator();
+    }
+
+    public static BlockType getBlockType(World world, int x, int y, int z) {
+        if (world == null) return BlockType.EMPTY;
+        SectionReader reader = new SectionReader(world.getChunkStore());
+        int id = reader.getBlock(x, y, z);
+        if (id == 0) return BlockType.EMPTY;
+        BlockType type = BlockType.getAssetMap().getAsset(id);
+        return type != null ? type : BlockType.EMPTY;
+    }
+
+    public static boolean setBlock(World world, int x, int y, int z, String blockName, int flags) {
+        if (world == null) return false;
+        ChunkStore cs = world.getChunkStore();
+        Ref<ChunkStore> sectionRef = cs.getChunkSectionReferenceAtBlock(x, y, z);
+        if (sectionRef == null || !sectionRef.isValid()) return false;
+        int blockId = "Empty".equalsIgnoreCase(blockName) ? 0 : BlockType.getAssetMap().getIndex(blockName);
+        BlockType blockType = (blockId == 0) ? BlockType.EMPTY : BlockType.getAssetMap().getAsset(blockId);
+        return BlockOperations.setBlock(cs, sectionRef, x, y, z, blockId, blockType, 0, 0, flags);
     }
 
     public void performVeinMine(Player player, Ref<EntityStore> pRef, Vector3i startPos, String targetId, BlockType startBlockType, Store<EntityStore> store, String uuid, int effectiveLimit) {
@@ -119,7 +140,7 @@ public class MiningManager {
 
         blocksToBreak.removeIf(pos -> {
             if (ACTIVE_VEINS.contains(pos)) return true;
-            BlockType t = world.getBlockType(pos.x, pos.y, pos.z);
+            BlockType t = getBlockType(world, pos.x, pos.y, pos.z);
             if (t == null) return true;
             String tid = t.getId();
             if (tid.contains("_Cracked") && targetMode.equals("ores")) return true;
@@ -146,7 +167,7 @@ public class MiningManager {
         IS_VEIN_MINING.set(true);
         try {
             for (Vector3i pos : blocksToBreak) {
-                BlockType type = world.getBlockType(pos.x, pos.y, pos.z);
+                BlockType type = getBlockType(world, pos.x, pos.y, pos.z);
                 if (type == null) continue;
                 double blockCost = 0;
                 if (!isCreative && tool != null) {
@@ -220,7 +241,7 @@ public class MiningManager {
 
     private List<ItemStack> breakBlockAndGetDrops(World world, Vector3i pos, boolean isCreative, String dropMode, Store<EntityStore> store, Ref<EntityStore> entityRef, ItemStack tool, String toolId) {
         List<ItemStack> drops = new ArrayList<>();
-        BlockType type = world.getBlockType(pos.x, pos.y, pos.z);
+        BlockType type = getBlockType(world, pos.x, pos.y, pos.z);
         if (type == null) return drops;
 
         BreakBlockEvent breakEvent = new BreakBlockEvent(tool, pos, type);
@@ -229,7 +250,7 @@ public class MiningManager {
         if (!isCreative) {
             drops.addAll(getRealDrops(world, pos, type, toolId));
         }
-        world.setBlock(pos.x, pos.y, pos.z, "Empty", PERFORM_BLOCK_UPDATE);
+        setBlock(world, pos.x, pos.y, pos.z, "Empty", PERFORM_BLOCK_UPDATE);
         return drops;
     }
 
@@ -323,7 +344,7 @@ public class MiningManager {
     private boolean isValidId(String id) { return id != null && !id.trim().isEmpty() && !id.equalsIgnoreCase("Empty"); }
     private boolean isDecoBlock(World world, Vector3i pos) {
         try {
-            ChunkStore cs = world.getChunkStore(); Ref<ChunkStore> ref = cs.getChunkSectionReference(pos.x, pos.y, pos.z);
+            ChunkStore cs = world.getChunkStore(); Ref<ChunkStore> ref = cs.getChunkSectionReferenceAtBlock(pos.x, pos.y, pos.z);
             if (ref != null && ref.isValid()) {
                 BlockPhysics bp = cs.getStore().getComponent(ref, BlockPhysics.getComponentType());
                 return bp != null && bp.isDeco(pos.x, pos.y, pos.z);

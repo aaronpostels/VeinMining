@@ -1,7 +1,7 @@
 {
     "Group": "EineNT",
     "Name": "VeinMining",
-    "Version": "2.4.0",
+    "Version": "2.5.0",
     "Description": "Instantly mine connected ores and blocks by holding the Walk key (LEFT ALT). /veinmining to configure.",
     "Authors": [
         {
@@ -11,7 +11,7 @@
             "Name": "Riprod"
         }
     ],
-    "ServerVersion": ">=0.6.0 <0.7.0",
+    "ServerVersion": ">=0.7.0 <0.8.0",
     "Main": "com.einent.veinmining.VeinMiningPlugin",
     "IncludesAssetPack": true,
     "Dependencies": {
